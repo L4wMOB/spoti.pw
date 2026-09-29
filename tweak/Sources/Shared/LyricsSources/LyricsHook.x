@@ -448,6 +448,21 @@ static void finishSpotify(id delegate, NSURLSession *session, NSURLSessionDataTa
         forward(error);
         return;
     }
+    // TEMPORARY, for finding the fields Spotify's own word-synced timing comes in: dumps every
+    // genuine color-lyrics reply to Documents, one file per track, so a real one can be pulled off
+    // the device and read. Pull it with Filza/SSH from the app's own container, e.g.
+    // /var/mobile/Containers/Data/Application/<UUID>/Documents/spoti-lyrics-debug/, or with
+    // `xcrun devicectl device copy from` if it is a sideloaded install rather than a system one.
+    // Remove this block (and the #import <Foundation/Foundation.h> above stays, it is already
+    // imported through Core/SGCore.h) once a sample is in hand.
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSString *dir = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/spoti-lyrics-debug"];
+        [NSFileManager.defaultManager createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *ext = body.length && ((const uint8_t *)body.bytes)[0] == '{' ? @"json" : @"pb";
+        NSString *path = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.%@", state.track, ext]];
+        [body writeToFile:path atomically:YES];
+        SGLog(@"lyrics debug: wrote %@ (%lu bytes)", path, (unsigned long)body.length);
+    });
     if (isJSON(body)) {
         give(delegate, session, task, state, body);
         forward(nil);
