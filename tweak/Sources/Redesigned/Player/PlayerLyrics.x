@@ -69,9 +69,8 @@ static const NSTimeInterval kLyricsIn = 0.3, kLyricsInDelay = 0.12, kLyricsOut =
 static const NSTimeInterval kLyricsGrace = 3;
 // Below this the player has not laid out yet and nothing can be measured from it.
 static const CGFloat kLivingHeight = 200;
-// The lines alone: this long untouched while they play, and the controls go. They go slowly, being
-// nothing the eye waits for, and come back quickly, since a touch asked for them.
-static const NSTimeInterval kAloneAfter = 4;
+// Disabled outright (scheduleAlone), by preference. kAloneOut/kAloneBack still time setAlone's own
+// transition, used only with alone=NO now, back to the controls staying up.
 static const NSTimeInterval kAloneOut = 0.6, kAloneBack = 0.3;
 // Lighter than the Kit's glyph buttons: a picture dimmed to half reads as gone, not pressed.
 static const CGFloat kThumbPressScale = 0.94, kThumbPressAlpha = 0.8;
@@ -417,34 +416,17 @@ static void setAlone(BOOL alone, BOOL animated) {
           alone ? CGRectGetMinY(l.room) : CGRectGetMinY(l.stage), alone ? CGRectGetMaxY(l.room) : CGRectGetMaxY(l.stage));
 }
 
-// The lines on the player and the song playing, with nothing over the player and no one listening to
-// its controls with VoiceOver.
-static BOOL mayGoAlone(void) {
-    UIView *host = sg_host;
-    SGRPlayerLyricsOverlay *overlay = host ? objc_getAssociatedObject(host, &kOverlayKey) : nil;
-    if (!sg_open || sg_moving || sg_singHeld || !host.window || !overlay.superview || overlay.lyrics.hidden) return NO;
-    SPTPlayerState *state = SGPlayerState();
-    if (!state || state.isPaused) return NO;
-    // A sheet the player opens (the queue, the devices, the menu) is presented by its topmost controller.
-    UIViewController *top = sg_player;
-    while (top.parentViewController) top = top.parentViewController;
-    if (top.presentedViewController) return NO;
-    return !SGRPlayerIsTransitioning() && !UIAccessibilityIsVoiceOverRunning()
-        && UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
-}
-
 // Counts the time untouched from now. A timer that finds the lines not in (a track still bringing its
 // own) or a sheet over the player starts over. One that finds the song paused or the app away lets it
 // be, so a locked phone playing on is not woken for it: playing again starts it (SGRPlayerLyricsWatcher),
 // and so does the app coming back (the %ctor).
+//
+// Disabled outright, by preference: the controls stay up with the lines for good, never fading to
+// leave them alone, so nothing here ever schedules the timer that would. setAlone(YES, â¦) has this as
+// its only way in, so the rest of the file's "alone" plumbing (mayGoAlone, the band shrinking to the
+// room, the header and thumbnail going) simply never fires and sg_alone stays NO throughout.
 static void scheduleAlone(void) {
     stopAloneTimer();
-    if (!sg_open || sg_alone) return;
-    sg_aloneTimer = [NSTimer scheduledTimerWithTimeInterval:kAloneAfter repeats:NO block:^(NSTimer *timer) {
-        sg_aloneTimer = nil;
-        if (mayGoAlone()) setAlone(YES, YES);
-        else if (sg_open && !SGPlayerState().isPaused && UIApplication.sharedApplication.applicationState == UIApplicationStateActive) scheduleAlone();
-    }];
 }
 
 // A touch has begun somewhere on the player, on `view`.
