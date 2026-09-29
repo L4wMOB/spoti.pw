@@ -101,6 +101,11 @@ static void finish(UIViewController *unit, BOOL changed) {
             if (SGHidden(SGHideQueue)) changed |= vanish(item);
         } else if (item.bounds.size.width <= 48 && SGHasClass(item, @"EncoreButton")) {
             if (SGHidden(SGHideShare)) changed |= vanish(item);
+        } else {
+            // Spotify's own word-synced lyrics pill lands here too, wider than the row's three known
+            // glyphs and unaccounted for by any of them: gone outright, not behind a switch, since
+            // nothing this row ever grows on its own is a control worth keeping.
+            changed |= vanish(item);
         }
     }
     finish((UIViewController *)self, changed);
